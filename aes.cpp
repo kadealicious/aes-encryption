@@ -16,6 +16,7 @@ BYTE GetRconValue(BYTE b);
 void RotateWord(BYTE (&word)[4]);
 void CoreAES(BYTE (&word)[4], int iteration);
 void ExpandKey(BYTE (&expanded_key)[EXPANDED_KEY_SIZE], BYTE key[BLOCK_SIZE]);
+void DecryptBlock(BYTE (&decrypted_block)[BLOCK_SIZE], BYTE input_block[BLOCK_SIZE], BYTE key[BLOCK_SIZE]);
 
 /// Display the menu and get user input.
 char DisplayMenu()
@@ -55,35 +56,6 @@ void EncryptFile(BYTE key[BLOCK_SIZE], string unencrypted_file_path)
 		return;
 	}
 	cout << "Unencrypted file data: " << file_data << endl;
-}
-
-/** Decrypt a block a AES-128 cipher text; if successful, will place a cstring 
-	into the decrypted_block parameter. */
-void DecryptBlock(BYTE (&decrypted_block)[BLOCK_SIZE], BYTE input_block[BLOCK_SIZE], BYTE key[BLOCK_SIZE])
-{
-	BYTE expanded_key[EXPANDED_KEY_SIZE];
-	ExpandKey(expanded_key, key);
-	
-	cout << "Key:" << endl;
-	for(int i = 0; i < BLOCK_SIZE; i++) { cout << key[i]; }
-	cout << endl;
-	cout << "Expanded Key:" << endl;
-	for(int i = 0; i < EXPANDED_KEY_SIZE; i++)
-	{
-		cout << expanded_key[i];
-		if(i % BLOCK_SIZE == 0 && i > 0)
-		cout << endl;
-	}
-	cout << endl;
-	
-	// Swap rows and columns (AES is column major).
-	for(int i = 0; i < 4; i++)
-	{
-		for(int j = 0; j < 4; j++)
-		{
-			decrypted_block[(i + (j * 4))] = input_block[(i * 4) + j];
-		}
-	}
 }
 
 /// Decrypt a file that was encrypted using AES-128.
@@ -139,6 +111,59 @@ int main(int argc, char* argv[])
 	
 	printf("Bye bye!\n");
 	return 0;
+}
+
+/// Performs an inverse of the AES-128 encryption round operation sequence.
+void PerformInvertedAES(BYTE (&decrypted_block)[BLOCK_SIZE], BYTE expanded_key[EXPANDED_KEY_SIZE])
+{
+	BYTE round_key[BLOCK_SIZE];
+	
+	// TODO: Create round key
+	// TODO: Add round key to state matrix
+	// TODO: Perform round operations for all 10 rounds (10th round is special).
+}
+
+/** Decrypt a block a AES-128 cipher text; if successful, will place a cstring 
+	into the decrypted_block parameter. */
+void DecryptBlock(BYTE (&decrypted_block)[BLOCK_SIZE], BYTE input_block[BLOCK_SIZE], BYTE key[BLOCK_SIZE])
+{
+	BYTE expanded_key[EXPANDED_KEY_SIZE];
+	ExpandKey(expanded_key, key);
+	
+	// cout << "Key:" << endl;
+	// for(int i = 0; i < BLOCK_SIZE; i++) { cout << key[i]; }
+	// cout << endl;
+	// cout << "Expanded Key:" << endl;
+	// for(int i = 0; i < EXPANDED_KEY_SIZE; i++)
+	// {
+	// 	cout << expanded_key[i];
+	// 	if(i % BLOCK_SIZE == 0 && i > 0)
+	// 	cout << endl;
+	// }
+	// cout << endl;
+	
+	// Store an intermediate block for processing without corrupting our output.
+	BYTE processing_block[BLOCK_SIZE];
+	
+	// Swap rows and columns (AES is column-major but data is stored row-major).
+	for(int i = 0; i < 4; i++)
+	{
+		for(int j = 0; j < 4; j++)
+		{
+			processing_block[(i + (j * 4))] = input_block[(i * 4) + j];
+		}
+	}
+	
+	PerformInvertedAES(decrypted_block, expanded_key);
+	
+	// Swap rows and columns one last time.
+	for(int i = 0; i < 4; i++)
+	{
+		for(int j = 0; j < 4; j++)
+		{
+			decrypted_block[(i * 4) + j] = processing_block[(i + (j * 4))];
+		}
+	}
 }
 
 /// Rotate a word by 1 byte.
@@ -207,18 +232,6 @@ BYTE GetRconValue(BYTE b)
 	return rcon[b];
 }
 
-void CoreAES(BYTE (&word)[4], int iteration)
-{
-	// Rotate our word 1 byte to the left.
-	RotateWord(word);
-	
-	// Apply S-Box substitution on all 4 bytes of our word.
-	for(int i = 0; i < 4; i++) { word[i] = GetSBoxValue(word[i]); }
-	
-	// XOR output of rcon[i] to the leftmost byte of our word.
-	word[0] = word[0] ^ GetRconValue(iteration);
-}
-
 void ExpandKey(BYTE (&expanded_key)[EXPANDED_KEY_SIZE], BYTE key[BLOCK_SIZE])
 {
 	int current_key_size	= 0;
@@ -239,7 +252,17 @@ void ExpandKey(BYTE (&expanded_key)[EXPANDED_KEY_SIZE], BYTE key[BLOCK_SIZE])
 		
 		/* Every 16 bytes we apply what is known as the "core AES schedule" to 
 			our temp byte array, incrementing rcon_iteration after. */
-		if(current_key_size % BLOCK_SIZE == 0) { CoreAES(temp, rcon_iteration++); }
+		if(current_key_size % BLOCK_SIZE == 0)
+		{
+			// Rotate our word 1 byte to the left.
+			RotateWord(word);
+			
+			// Apply S-Box substitution on all 4 bytes of our word.
+			for(int i = 0; i < 4; i++) { word[i] = GetSBoxValue(word[i]); }
+			
+			// XOR output of rcon[i] to the leftmost byte of our word.
+			word[0] = word[0] ^ GetRconValue(iteration);
+		}
 		
 		/* XOR our temp byte array with values in our expanded key to grow it 
 			by 4 more bytes! */
