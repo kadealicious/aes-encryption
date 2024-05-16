@@ -18,9 +18,9 @@ void DisplayMenu()
 	printf("Your choice: ");
 }
 
-/// Attempt encryption using the referenced AES object.
-void TryEncryption(AES& aes) {
-
+/// Prompt the user for the desired file's path.
+string AskForFilePath() {
+	
 	// Clear stdin buffer.
 	cin.ignore(numeric_limits<streamsize>::max(), '\n');
 
@@ -29,30 +29,45 @@ void TryEncryption(AES& aes) {
     cout << "Please enter the file path: ";
     getline(cin, filePath);
 	
+	return filePath;
+}
+
+/// Get the contents of a file from its path.
+vector<unsigned char> GetFileContents(string file_path) {
+
 	// Read file into memory.
-    ifstream file(filePath, ios::binary);
+    ifstream file(file_path, ios::binary);
     if (!file.is_open()) {
-        cerr << "Failed to open file: " << filePath << '\n';
-        return;
+        cerr << "Failed to open file: " << file_path << '\n';
+		vector<unsigned char> empty_file(0);
+        return empty_file;
     }
 
 	// Read the file into file_contents.
-    vector<unsigned char> fileContents((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
+    vector<unsigned char> file_contents(
+		(istreambuf_iterator<char>(file)),
+		istreambuf_iterator<char>()
+	);
     file.close();
+	
+	return file_contents;
+}
+
+/// Attempt encryption using the referenced AES object.
+void TryEncryption(AES& aes, string file_path, vector<unsigned char> file_data) {
 
     try {
 		// Encrypt the data.
-        vector<unsigned char> encryptedData = aes.Encrypt(fileContents);
+        vector<unsigned char> encryptedData = aes.Encrypt(file_data);
 		
 		// Create a new file path with the name prefix "encrypted_".
-        fs::path p(filePath);
-        string newFileName = "encrypted_" + p.stem().string() + ".txt";
-        string newFilePath = p.parent_path().string() + "/" + newFileName;
+        fs::path path(file_path);
+        string newFileName = "encrypted_" + path.stem().string() + ".txt";
 
 		// Create and open the output file.
         ofstream outFile(newFileName, ios::out | ios::binary);
         if (!outFile.is_open()) {
-            cerr << "Failed to create output file: " << newFilePath << '\n';
+            cerr << "Failed to create output file: " << newFileName << '\n';
             return;
         }
 		
@@ -69,53 +84,33 @@ void TryEncryption(AES& aes) {
     }
 }
 
-/// Attempt encryption using the referenced AES object.
-void TryDecryption(AES& aes) {
-
-	// Clear stdin buffer.
-	cin.ignore(numeric_limits<streamsize>::max(), '\n');
-
-	// Get file path from user.
-	string filePath;
-    cout << "Please enter the file path: ";
-    getline(cin, filePath);
-	
-	// Read file into memory.
-    ifstream file(filePath, ios::binary);
-    if (!file.is_open()) {
-        cerr << "Failed to open file: " << filePath << '\n';
-        return;
-    }
-
-	// Read the file into file_contents.
-    vector<unsigned char> fileContents((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
-    file.close();
+/// Attempt decryption using the referenced AES object.
+void TryDecryption(AES& aes, string file_path, vector<unsigned char> file_data) {
 
     try {
 		// Encrypt the data.
-        vector<unsigned char> encryptedData = aes.Decrypt(fileContents);
+        vector<unsigned char> decryptedData = aes.Decrypt(file_data);
 		
-		// Create a new file path with the name prefix "encrypted_".
-        fs::path p(filePath);
-        string newFileName = "decrypted_" + p.stem().string() + ".txt";
-        string newFilePath = p.parent_path().string() + "/" + newFileName;
+		// Create a new file path with the name prefix "decrypted_".
+        fs::path path(file_path);
+        string newFileName = "decrypted_" + path.stem().string() + ".txt";
 
 		// Create and open the output file.
         ofstream outFile(newFileName, ios::out | ios::binary);
         if (!outFile.is_open()) {
-            cerr << "Failed to create output file: " << newFilePath << '\n';
+            cerr << "Failed to create output file: " << newFileName << '\n';
             return;
         }
 		
 		// Write to the output file and close it.
-        outFile.write(reinterpret_cast<const char*>(encryptedData.data()), encryptedData.size());
+        outFile.write(reinterpret_cast<const char*>(decryptedData.data()), decryptedData.size());
         outFile.close();
-        cout << "Decryption successful. Output file created: " << newFileName << endl;
+        cout << "Decryption successful. Output file created: " << newFileName << '\n';
 		
     } catch (const exception& e) {
 	
 		// Uh oh!  Encryption failed!!!
-        cerr << "Decryption failed: " << e.what() << endl;
+        cerr << "Decryption failed: " << e.what() << '\n';
         return;
     }
 }
@@ -142,17 +137,25 @@ int main() {
 		{
 			// Encrypt file.
 			case 'E':
-			case 'e':
-				TryEncryption(aes);
+			case 'e': {
+				// Get the contents of the user's favorite file and attempt to encrypt it!
+				string file_path = AskForFilePath();
+				vector<unsigned char> file_data = GetFileContents(file_path);
+				TryEncryption(aes, file_path, file_data);
 				cout << endl;
 				break;
+			}
 
 			// Decrypt file.
 			case 'D':
-			case 'd':
-				TryDecryption(aes);
+			case 'd': {
+				// Get the contents of the user's favorite file and attempt to decrypt it.
+				string file_path = AskForFilePath();
+				vector<unsigned char> file_data = GetFileContents(file_path);
+				TryDecryption(aes, file_path, file_data);
 				cout << endl;
 				break;
+			}
 
 			case '\n':
 			default:
