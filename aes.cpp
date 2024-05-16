@@ -1,275 +1,251 @@
+#include "aes.hpp"
+#include <cstring>
+#include<stdexcept>
 #include<iostream>
-#include<string>
-#include<fstream>
-#include<sstream>
 
 using namespace std;
 
-#define ROUND_COUNT			10
-#define BLOCK_SIZE			16
-#define EXPANDED_KEY_SIZE	176
-
-typedef unsigned char BYTE;
-
-BYTE GetSBoxValue(BYTE b);
-BYTE GetRconValue(BYTE b);
-void RotateWord(BYTE (&word)[4]);
-void CoreAES(BYTE (&word)[4], int iteration);
-void ExpandKey(BYTE (&expanded_key)[EXPANDED_KEY_SIZE], BYTE key[BLOCK_SIZE]);
-void DecryptBlock(BYTE (&decrypted_block)[BLOCK_SIZE], BYTE input_block[BLOCK_SIZE], BYTE key[BLOCK_SIZE]);
-
-/// Display the menu and get user input.
-char DisplayMenu()
-{
-	printf("Please choose a command:\n");
-	printf(" - [E]ncrypt\n");
-	printf(" - [D]ecrypt\n");
-	printf(" - [Q]uit the program\n");
-	printf("Your choice: ");
-
-	return getchar();
-}
-
-/// Return data from a file given a path.
-string ReadFile(string file_path)
-{
-	ifstream file_stream(file_path);
-	string file_data;
-	if(file_stream)
-	{
-		ostringstream ss;
-		ss << file_stream.rdbuf();
-		file_data = ss.str();
-		return file_data;
-	}
-	cout << "File \"" << file_path << "\" not found!" << endl;
-	return "";
-}
-
-/// Encrypt a file using AES-128.
-void EncryptFile(BYTE key[BLOCK_SIZE], string unencrypted_file_path)
-{
-	string file_data = ReadFile(unencrypted_file_path);
-	if(file_data == "")
-	{
-		cout << "Nothing to encrypt!" << endl;
+AES::AES(const vector<uint8_t>& key) {
+    if (key.size() != 16) {
+		cerr << "Invalid key size for AES-128!  Key size must be 128 bits." << endl;
 		return;
 	}
-	cout << "Unencrypted file data: " << file_data << endl;
+	
+	Nk = 4;			// There are 4 32-bit words in AES-128 keys.
+	Nr = 10;		// AES-128 always has 10 rounds!
+    ExpandKey(key);	// The key is expanded to 176 bytes, up from 128 bits.
 }
 
-/// Decrypt a file that was encrypted using AES-128.
-void DecryptFile(BYTE key[BLOCK_SIZE], string encrypted_file_path)
-{
-	string file_data = ReadFile(encrypted_file_path);
-	
-	BYTE test_input_block[BLOCK_SIZE];
-	BYTE test_output_block[BLOCK_SIZE];
-	DecryptBlock(test_output_block, test_input_block, key);
-	
-	if(file_data == "")
-	{
-		cout << "Nothing to decrypt!" << endl;
-		return;
-	}
-	cout << "Encrypted file data: " << file_data << endl;
-}
+void AES::ExpandKey(const vector<uint8_t>& key) {
+    const size_t keyWords = key.size() / 4;			// keyWords for AES-128 is always 4.
+    const size_t expandedKeySize = Nb * (Nr + 1); 	// Expanded key size is 176 bytes for AES-128.
 
-int main(int argc, char* argv[])
-{
-	printf("AES Encryption Demo - Kade Samson & Ari Salehpour\n");
-	
-	char user_choice		= '\0';
-	BYTE key[BLOCK_SIZE]	= {'0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0'};
-	
-	// While we have not quit, cycle through user input and options.
-	while(user_choice != 'Q' && user_choice != 'q')
-	{
-		// After the user enters input, don't display the menu twice.
-		if(user_choice != '\n')	{ user_choice = DisplayMenu(); }
-		else					{ user_choice = getchar(); }
+    // Copy the original key to the first bits of the expanded key.
+    for (size_t i = 0; i < keyWords; ++i) {
+        expandedKey[4 * i + 0] = key[4 * i + 0];
+        expandedKey[4 * i + 1] = key[4 * i + 1];
+        expandedKey[4 * i + 2] = key[4 * i + 2];
+        expandedKey[4 * i + 3] = key[4 * i + 3];
+    }
 
-		// Handle user choices.
-		switch(user_choice)
-		{
-			// Encrypt file.
-			case 'E':
-			case 'e':
-				EncryptFile(key, "secret_message.txt");
-				break;
+	// Generate the next 4 bits of the expanded key until we can't no mo.
+    for (size_t i = keyWords; i < expandedKeySize; ++i) {
+	
+		// Temp will be used to hold the current 4 bytes of the expanded key we are working on.
+    	uint32_t temp = (expandedKey[4 * (i - 1) + 0] << 24) |
+               (expandedKey[4 * (i - 1) + 1] << 16) |
+               (expandedKey[4 * (i - 1) + 2] << 8) |
+               (expandedKey[4 * (i - 1) + 3]);
 
-			// Decrypt file.
-			case 'D':
-			case 'd':
-				DecryptFile(key, "secret_message_encrypted.txt");
-				break;
-
-			default:
-				break;
-		}
-	}
-	
-	printf("Bye bye!\n");
-	return 0;
-}
-
-/// Performs an inverse of the AES-128 encryption round operation sequence.
-void PerformInvertedAES(BYTE (&decrypted_block)[BLOCK_SIZE], BYTE expanded_key[EXPANDED_KEY_SIZE])
-{
-	BYTE round_key[BLOCK_SIZE];
-	
-	// TODO: Create round key
-	// TODO: Add round key to state matrix
-	// TODO: Perform round operations for all 10 rounds (10th round is special).
-}
-
-/** Decrypt a block a AES-128 cipher text; if successful, will place a cstring 
-	into the decrypted_block parameter. */
-void DecryptBlock(BYTE (&decrypted_block)[BLOCK_SIZE], BYTE input_block[BLOCK_SIZE], BYTE key[BLOCK_SIZE])
-{
-	BYTE expanded_key[EXPANDED_KEY_SIZE];
-	ExpandKey(expanded_key, key);
-	
-	// cout << "Key:" << endl;
-	// for(int i = 0; i < BLOCK_SIZE; i++) { cout << key[i]; }
-	// cout << endl;
-	// cout << "Expanded Key:" << endl;
-	// for(int i = 0; i < EXPANDED_KEY_SIZE; i++)
-	// {
-	// 	cout << expanded_key[i];
-	// 	if(i % BLOCK_SIZE == 0 && i > 0)
-	// 	cout << endl;
-	// }
-	// cout << endl;
-	
-	// Store an intermediate block for processing without corrupting our output.
-	BYTE processing_block[BLOCK_SIZE];
-	
-	// Swap rows and columns (AES is column-major but data is stored row-major).
-	for(int i = 0; i < 4; i++)
-	{
-		for(int j = 0; j < 4; j++)
-		{
-			processing_block[(i + (j * 4))] = input_block[(i * 4) + j];
-		}
-	}
-	
-	PerformInvertedAES(decrypted_block, expanded_key);
-	
-	// Swap rows and columns one last time.
-	for(int i = 0; i < 4; i++)
-	{
-		for(int j = 0; j < 4; j++)
-		{
-			decrypted_block[(i * 4) + j] = processing_block[(i + (j * 4))];
-		}
-	}
-}
-
-/// Rotate a word by 1 byte.
-void RotateWord(BYTE (&word)[4])
-{
-	BYTE b = word[0];
-	for(int i = 0; i < 3; i++)
-		word[i] = word[i + 1];
-	word[3] = b;
-}
-
-/// Get the pre-computed S-Box value for a number.
-BYTE GetSBoxValue(BYTE b)
-{
-	// S-Box values courtest of Meysam Parvizi (@m3y54m) on GitHub.
-	unsigned char sbox[256] =
-	{
-		0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
-		0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
-		0xb7, 0xfd, 0x93, 0x26, 0x36, 0x3f, 0xf7, 0xcc, 0x34, 0xa5, 0xe5, 0xf1, 0x71, 0xd8, 0x31, 0x15,
-		0x04, 0xc7, 0x23, 0xc3, 0x18, 0x96, 0x05, 0x9a, 0x07, 0x12, 0x80, 0xe2, 0xeb, 0x27, 0xb2, 0x75,
-		0x09, 0x83, 0x2c, 0x1a, 0x1b, 0x6e, 0x5a, 0xa0, 0x52, 0x3b, 0xd6, 0xb3, 0x29, 0xe3, 0x2f, 0x84,
-		0x53, 0xd1, 0x00, 0xed, 0x20, 0xfc, 0xb1, 0x5b, 0x6a, 0xcb, 0xbe, 0x39, 0x4a, 0x4c, 0x58, 0xcf,
-		0xd0, 0xef, 0xaa, 0xfb, 0x43, 0x4d, 0x33, 0x85, 0x45, 0xf9, 0x02, 0x7f, 0x50, 0x3c, 0x9f, 0xa8,
-		0x51, 0xa3, 0x40, 0x8f, 0x92, 0x9d, 0x38, 0xf5, 0xbc, 0xb6, 0xda, 0x21, 0x10, 0xff, 0xf3, 0xd2,
-		0xcd, 0x0c, 0x13, 0xec, 0x5f, 0x97, 0x44, 0x17, 0xc4, 0xa7, 0x7e, 0x3d, 0x64, 0x5d, 0x19, 0x73,
-		0x60, 0x81, 0x4f, 0xdc, 0x22, 0x2a, 0x90, 0x88, 0x46, 0xee, 0xb8, 0x14, 0xde, 0x5e, 0x0b, 0xdb,
-		0xe0, 0x32, 0x3a, 0x0a, 0x49, 0x06, 0x24, 0x5c, 0xc2, 0xd3, 0xac, 0x62, 0x91, 0x95, 0xe4, 0x79,
-		0xe7, 0xc8, 0x37, 0x6d, 0x8d, 0xd5, 0x4e, 0xa9, 0x6c, 0x56, 0xf4, 0xea, 0x65, 0x7a, 0xae, 0x08,
-		0xba, 0x78, 0x25, 0x2e, 0x1c, 0xa6, 0xb4, 0xc6, 0xe8, 0xdd, 0x74, 0x1f, 0x4b, 0xbd, 0x8b, 0x8a,
-		0x70, 0x3e, 0xb5, 0x66, 0x48, 0x03, 0xf6, 0x0e, 0x61, 0x35, 0x57, 0xb9, 0x86, 0xc1, 0x1d, 0x9e,
-		0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e, 0x94, 0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf,
-		0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16
-	};
-	return sbox[b];
-}
-
-/// Get the pre-computed Rcon value for a number.
-BYTE GetRconValue(BYTE b)
-{
-	// Rcon values courtest of Meysam Parvizi (@m3y54m) on GitHub.
-	unsigned char rcon[255] =
-	{
-		0x8d, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8,
-		0xab, 0x4d, 0x9a, 0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4, 0xb3,
-		0x7d, 0xfa, 0xef, 0xc5, 0x91, 0x39, 0x72, 0xe4, 0xd3, 0xbd, 0x61, 0xc2, 0x9f,
-		0x25, 0x4a, 0x94, 0x33, 0x66, 0xcc, 0x83, 0x1d, 0x3a, 0x74, 0xe8, 0xcb, 0x8d,
-		0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8, 0xab,
-		0x4d, 0x9a, 0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4, 0xb3, 0x7d,
-		0xfa, 0xef, 0xc5, 0x91, 0x39, 0x72, 0xe4, 0xd3, 0xbd, 0x61, 0xc2, 0x9f, 0x25,
-		0x4a, 0x94, 0x33, 0x66, 0xcc, 0x83, 0x1d, 0x3a, 0x74, 0xe8, 0xcb, 0x8d, 0x01,
-		0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8, 0xab, 0x4d,
-		0x9a, 0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4, 0xb3, 0x7d, 0xfa,
-		0xef, 0xc5, 0x91, 0x39, 0x72, 0xe4, 0xd3, 0xbd, 0x61, 0xc2, 0x9f, 0x25, 0x4a,
-		0x94, 0x33, 0x66, 0xcc, 0x83, 0x1d, 0x3a, 0x74, 0xe8, 0xcb, 0x8d, 0x01, 0x02,
-		0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8, 0xab, 0x4d, 0x9a,
-		0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4, 0xb3, 0x7d, 0xfa, 0xef,
-		0xc5, 0x91, 0x39, 0x72, 0xe4, 0xd3, 0xbd, 0x61, 0xc2, 0x9f, 0x25, 0x4a, 0x94,
-		0x33, 0x66, 0xcc, 0x83, 0x1d, 0x3a, 0x74, 0xe8, 0xcb, 0x8d, 0x01, 0x02, 0x04,
-		0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8, 0xab, 0x4d, 0x9a, 0x2f,
-		0x5e, 0xbc, 0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4, 0xb3, 0x7d, 0xfa, 0xef, 0xc5,
-		0x91, 0x39, 0x72, 0xe4, 0xd3, 0xbd, 0x61, 0xc2, 0x9f, 0x25, 0x4a, 0x94, 0x33,
-		0x66, 0xcc, 0x83, 0x1d, 0x3a, 0x74, 0xe8, 0xcb
-	};
-	
-	return rcon[b];
-}
-
-void ExpandKey(BYTE (&expanded_key)[EXPANDED_KEY_SIZE], BYTE key[BLOCK_SIZE])
-{
-	int current_key_size	= 0;
-	int rcon_iteration		= 1;
-	
-	// First, copy the 16-byte key into the first 16 bytes of the expanded key.
-	for(int i = 0; i < BLOCK_SIZE; i++) { expanded_key[i] = key[i]; }
-	current_key_size += BLOCK_SIZE;
-	
-	// Generate the rest of our expanded key!
-	while(current_key_size < EXPANDED_KEY_SIZE)
-	{
-		// This will be used to extend our key 4 bytes at a time.
-		BYTE temp[4];
-		
-		// Assign the previous first 4 bytes of our current key to our temp byte array.
-		for(int i = 0; i < 4; i++) { temp[i] = expanded_key[(current_key_size - 4) + i]; }
-		
-		/* Every 16 bytes we apply what is known as the "core AES schedule" to 
-			our temp byte array, incrementing rcon_iteration after. */
-		if(current_key_size % BLOCK_SIZE == 0)
-		{
-			// Rotate our word 1 byte to the left.
-			RotateWord(word);
+        if (i % keyWords == 0) {
+			// Rotate left by 8 bits.
+            temp = (temp << 8) | (temp >> 24);
 			
-			// Apply S-Box substitution on all 4 bytes of our word.
-			for(int i = 0; i < 4; i++) { word[i] = GetSBoxValue(word[i]); }
-			
-			// XOR output of rcon[i] to the leftmost byte of our word.
-			word[0] = word[0] ^ GetRconValue(iteration);
-		}
-		
-		/* XOR our temp byte array with values in our expanded key to grow it 
-			by 4 more bytes! */
-		for(int i = 0; i < 4; i++)
-		{
-			expanded_key[current_key_size] = expanded_key[current_key_size - BLOCK_SIZE] ^ temp[i];
-			current_key_size++;
-		}
+			// S-Box substitution formula; this scares me: 
+            temp = (sbox[(temp >> 24) & 0xFF] << 24) |
+                   (sbox[(temp >> 16) & 0xFF] << 16) |
+                   (sbox[(temp >> 8) & 0xFF] << 8) |
+                   (sbox[temp & 0xFF]);
+
+            // XOR with round constant.
+            temp ^= (uint32_t(rcon[i / keyWords]) << 24);
+        }
+
+        // XOR with the word Nk positions before.
+        temp ^= (expandedKey[4 * (i - keyWords) + 0] << 24) |
+                (expandedKey[4 * (i - keyWords) + 1] << 16) |
+                (expandedKey[4 * (i - keyWords) + 2] << 8) |
+                (expandedKey[4 * (i - keyWords) + 3]);
+
+		// Assign the values in temp to the expanded key.
+        expandedKey[4 * i + 0] = temp >> 24;
+        expandedKey[4 * i + 1] = (temp >> 16) & 0xFF;
+        expandedKey[4 * i + 2] = (temp >> 8) & 0xFF;
+        expandedKey[4 * i + 3] = temp & 0xFF;
+    }
+}
+
+/** Round key generation is performed at the start of each round.  It is done by
+	modifying the expanded key positionally based on the round index. */
+void AES::AddRoundKey(array<uint8_t, 16>& state, int round) {
+
+	// Start index into the expanded key to impact the round key.
+    size_t start = round * Nb * 4;
+	
+	// Round keys are XOR'd into the expanded key, starting at the index of start.
+    for (int i = 0; i < 16; ++i) {
+        state[i] ^= expandedKey[start + i];
+    }
+}
+
+/// S-Box substitution method.
+void AES::SubstituteBytes(array<uint8_t, 16>& state) {
+    for (int i = 0; i < 16; ++i) {
+        state[i] = sbox[state[i]];
+    }
+}
+
+/// Essentially a rotation of the current encryption state.
+void AES::ShiftRows(array<uint8_t, 16>& state) {
+
+    array<uint8_t, 16> temp = state;
+    
+	// Do not shift Row 0!
+
+    // Row 1 shifts left by 1: 
+    state[1] = temp[5];
+    state[5] = temp[9];
+    state[9] = temp[13];
+    state[13] = temp[1];
+
+    // Row 2 shifts left by 2: 
+    state[2] = temp[10];
+    state[6] = temp[14];
+    state[10] = temp[2];
+    state[14] = temp[6];
+
+    // Row 3 shifts left by 3: 
+    state[3] = temp[15];
+    state[7] = temp[3];
+    state[11] = temp[7];
+    state[15] = temp[11];
+}
+
+/// Inverse S-Box substitution method.
+void AES::InverseSubstituteBytes(array<uint8_t, 16>& state) {
+    for (int i = 0; i < 16; ++i) {
+        state[i] = inverse_sbox[state[i]];
+    }
+}
+
+/// Shift the rows back to where they came from!
+void AES::InverseShiftRows(array<uint8_t, 16>& state) {
+
+    array<uint8_t, 16> temp = state;
+    
+	// Do not shift Row 0!
+
+    // Row 1 shifts right by 1: 
+    state[5] = temp[1];
+    state[9] = temp[5];
+    state[13] = temp[9];
+    state[1] = temp[13];
+
+    // Row 2 shifts right by 2: 
+    state[10] = temp[2];
+    state[14] = temp[6];
+    state[2] = temp[10];
+    state[6] = temp[14];
+
+    // Row 3 shifts right by 3: 
+    state[15] = temp[3];
+    state[3] = temp[7];
+    state[7] = temp[11];
+    state[11] = temp[15];
+}
+
+// Perform "Galois" multiplication.
+uint8_t AES::GaloisMultiply(uint8_t a, uint8_t b) {
+    uint8_t p = 0;
+    for (int i = 0; i < 8; i++) {
+        if (b & 1) {
+            p ^= a;
+        }
+        bool high_bit_set = (a & 0x80);
+        a <<= 1;
+        if (high_bit_set) {
+            a ^= 0x1b;
+        }
+        b >>= 1;
+    }
+    return p;
+}
+
+/// Encrypt data using AES-128!
+vector<uint8_t> AES::Encrypt(const vector<uint8_t>& plaintext) {
+	
+    // Create a vector for the encrypted data to live!
+    size_t dataSize = plaintext.size();
+    vector<uint8_t> encryptedData(dataSize);
+
+	// Temporary block for use during encryption.
+    array<uint8_t, 16> block;
+
+    for (size_t i = 0; i < dataSize; i += 16) {
+        // Copy the current block to our encrypted data block.
+        copy(plaintext.begin() + i, plaintext.begin() + i + 16, block.begin());
+
+        // Add a round key into our encryption.
+        AddRoundKey(block, 0);
+
+		/* For each round, perform S-Box substitution, shift rows of our 
+			encrypted data, and add a new round key.  Per professor request, 
+			we have omitted mix_columns(), as the math is crazy for that and 
+			this is not a math class.  Thank you Prof. Vickers!  :) */
+        for (int round = 1; round < Nr; round++) {
+            SubstituteBytes(block);
+            ShiftRows(block);
+            AddRoundKey(block, round);
+        }
+
+        // Copy the temporary block into the encrypted data block.
+        copy(block.begin(), block.end(), encryptedData.begin() + i);
+    }
+	
+	cout << "Your original data is: ";
+	for(size_t i = 0; i < plaintext.size(); i++) {
+		cout << plaintext[i];
 	}
+	cout << endl;
+	
+	cout << "Your encrypted data is: ";
+	for(size_t i = 0; i < encryptedData.size(); i++) {
+		cout << encryptedData[i];
+	}
+	cout << endl;
+
+    return encryptedData;
+}
+
+/// Encrypt data using AES-128!
+vector<uint8_t> AES::Decrypt(const vector<uint8_t>& ciphertext) {
+	
+    // Create a vector for the decrypted data to live!
+    size_t dataSize = ciphertext.size();
+    vector<uint8_t> decryptedData(dataSize);
+
+	// Temporary block for use during decryption.
+    array<uint8_t, 16> block;
+
+    for (size_t i = 0; i < dataSize; i += 16) {
+        // Copy the current block to our decrypted data block.
+        copy(ciphertext.begin() + i, ciphertext.begin() + i + 16, block.begin());
+
+        // Add a round key into our decryption.
+        AddRoundKey(block, 0);
+
+		// Perform the opposite of encryption here xD.
+        for (int round = 1; round < Nr; round++) {
+			InverseShiftRows(block);
+            InverseSubstituteBytes(block);
+            AddRoundKey(block, round);
+        }
+
+        // Copy the temporary block into the decrypted data block.
+        copy(block.begin(), block.end(), decryptedData.begin() + i);
+    }
+	
+	cout << "Your original data is: ";
+	for(size_t i = 0; i < ciphertext.size(); i++) {
+		cout << ciphertext[i];
+	}
+	cout << endl;
+	
+	cout << "Your decrypted data is: ";
+	for(size_t i = 0; i < decryptedData.size(); i++) {
+		cout << decryptedData[i];
+	}
+	cout << endl;
+
+    return decryptedData;
 }
