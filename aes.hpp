@@ -12,10 +12,10 @@ class AES {
 		std::vector<uint8_t> Decrypt(const std::vector<uint8_t>& ciphertext);
 		
 	private:
-		static constexpr int Nb = 4;			// Number of columns (32-bit words) comprising the State. For AES-128, Nb is always 4.
-		int Nk;									// Number of 32-bit words comprising the Cipher Key.
-		int Nr;									// Number of rounds, which is a function of Nk and Nb (which is fixed).
-		std::array<uint8_t, 176> expandedKey;	// Expanded key
+		static constexpr int Nb = 4;	// Number of columns (32-bit words) comprising the State. For AES-128, Nb is always 4.
+		int Nk;							// Number of 32-bit words comprising the Cipher Key.
+		int Nr;							// Number of rounds, which is a function of Nk and Nb (which is fixed).
+		uint8_t expandedKey[176];		// Expanded key is 176 bytes!
 
 		void ExpandKey(const std::vector<uint8_t>& key);
 		void AddRoundKey(std::array<uint8_t, 16>& state, int round);
@@ -23,11 +23,10 @@ class AES {
 		void ShiftRows(std::array<uint8_t, 16>& state);
 		void InverseSubstituteBytes(std::array<uint8_t, 16>& state);
 		void InverseShiftRows(std::array<uint8_t, 16>& state);
-		uint8_t GaloisMultiply(uint8_t a, uint8_t b);
 
 		/* The S-Box (Substitution Box) is a constant table of values which AES uses to 
 			obfuscate stream contents a bit further. */
-		static constexpr std::array<uint8_t, 256> sbox = {
+		static constexpr uint8_t sbox[256] = {
 			0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
 			0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
 			0xb7, 0xfd, 0x93, 0x26, 0x36, 0x3f, 0xf7, 0xcc, 0x34, 0xa5, 0xe5, 0xf1, 0x71, 0xd8, 0x31, 0x15,
@@ -48,7 +47,7 @@ class AES {
 		
 		/* The inverse S-Box is used to "undo" the substitution performed by the 
 			original AES encryption. */
-		static constexpr std::array<uint8_t, 256> inverse_sbox = {
+		static constexpr uint8_t inverse_sbox[256] = {
 			0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38, 0xbf, 0x40, 0xa3, 0x9e, 0x81, 0xf3, 0xd7, 0xfb,
 			0x7c, 0xe3, 0x39, 0x82, 0x9b, 0x2f, 0xff, 0x87, 0x34, 0x8e, 0x43, 0x44, 0xc4, 0xde, 0xe9, 0xcb,
 			0x54, 0x7b, 0x94, 0x32, 0xa6, 0xc2, 0x23, 0x3d, 0xee, 0x4c, 0x95, 0x0b, 0x42, 0xfa, 0xc3, 0x4e,
