@@ -53,32 +53,35 @@ vector<unsigned char> GetFileContents(string file_path) {
 	return file_contents;
 }
 
+void WriteToFile(string file_path, vector<unsigned char> encryptedData) {
+
+	// Create and open the output file.
+	ofstream outFile(file_path, ios::out | ios::binary);
+	if (!outFile.is_open()) {
+		cerr << "Failed to create output file: " << file_path << '\n';
+		return;
+	}
+	
+	// Write to the output file and close it.
+	outFile.write((const char*)encryptedData.data(), encryptedData.size());
+	outFile.close();
+	cout << "Encryption successful. Output file created: " << file_path << '\n';
+}
+
 /// Attempt encryption using the referenced AES object.
 void TryEncryption(AES& aes, string file_path, vector<unsigned char> file_data) {
 
     try {
-		// Encrypt the data.
+		// Attempt to encrypt the file data.
         vector<unsigned char> encryptedData = aes.Encrypt(file_data);
 		
 		// Create a new file path with the name prefix "encrypted_".
         fs::path path(file_path);
         string newFileName = "encrypted_" + path.stem().string() + ".txt";
-
-		// Create and open the output file.
-        ofstream outFile(newFileName, ios::out | ios::binary);
-        if (!outFile.is_open()) {
-            cerr << "Failed to create output file: " << newFileName << '\n';
-            return;
-        }
+		WriteToFile(newFileName, encryptedData);
 		
-		// Write to the output file and close it.
-        outFile.write(reinterpret_cast<const char*>(encryptedData.data()), encryptedData.size());
-        outFile.close();
-        cout << "Encryption successful. Output file created: " << newFileName << '\n';
-		
-    } catch (const exception& e) {
-	
 		// Uh oh!  Encryption failed!!!
+    } catch (const exception& e) {
         cerr << "Encryption failed: " << e.what() << '\n';
         return;
     }
@@ -88,28 +91,16 @@ void TryEncryption(AES& aes, string file_path, vector<unsigned char> file_data) 
 void TryDecryption(AES& aes, string file_path, vector<unsigned char> file_data) {
 
     try {
-		// Encrypt the data.
+		// Attempt to decrypt the file data.
         vector<unsigned char> decryptedData = aes.Decrypt(file_data);
 		
 		// Create a new file path with the name prefix "decrypted_".
         fs::path path(file_path);
         string newFileName = "decrypted_" + path.stem().string() + ".txt";
-
-		// Create and open the output file.
-        ofstream outFile(newFileName, ios::out | ios::binary);
-        if (!outFile.is_open()) {
-            cerr << "Failed to create output file: " << newFileName << '\n';
-            return;
-        }
+		WriteToFile(newFileName, decryptedData);
 		
-		// Write to the output file and close it.
-        outFile.write(reinterpret_cast<const char*>(decryptedData.data()), decryptedData.size());
-        outFile.close();
-        cout << "Decryption successful. Output file created: " << newFileName << '\n';
-		
-    } catch (const exception& e) {
-	
 		// Uh oh!  Encryption failed!!!
+    } catch (const exception& e) {
         cerr << "Decryption failed: " << e.what() << '\n';
         return;
     }

@@ -51,7 +51,7 @@ void AES::ExpandKey(const vector<uint8_t>& key) {
             temp ^= (uint32_t(rcon[i / keyWords]) << 24);
         }
 
-        // XOR with the word Nk positions before.
+        // XOR with the word Nk positions before the current word.
         temp ^= (expandedKey[4 * (i - keyWords) + 0] << 24) |
                 (expandedKey[4 * (i - keyWords) + 1] << 16) |
                 (expandedKey[4 * (i - keyWords) + 2] << 8) |
@@ -147,9 +147,10 @@ void AES::InverseShiftRows(array<uint8_t, 16>& block) {
 /// Encrypt data using AES-128!
 vector<uint8_t> AES::Encrypt(const vector<uint8_t>& plaintext) {
 	
-    // Create a vector for the encrypted data to live!
+    // Create a space-padded vector for our encrypted data to live!
     size_t dataSize = plaintext.size();
-    vector<uint8_t> encryptedData(dataSize);
+	dataSize += 16 - (dataSize % 16);
+    vector<uint8_t> encryptedData(dataSize, (uint8_t)' ');
 
 	// Temporary block for use during encryption.
     array<uint8_t, 16> block;
@@ -157,9 +158,6 @@ vector<uint8_t> AES::Encrypt(const vector<uint8_t>& plaintext) {
     for (size_t i = 0; i < dataSize; i += 16) {
         // Copy the current block to our encrypted data block.
         copy(plaintext.begin() + i, plaintext.begin() + i + 16, block.begin());
-
-        // Add a round key into our encryption.
-        // AddRoundKey(block, 0);
 
 		/* For each round, perform S-Box substitution, shift rows of our 
 			encrypted data, and add a new round key.  Per professor request, 
