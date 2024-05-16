@@ -10,7 +10,7 @@ Using your compiler of choice, compile main.cpp and aes.cpp together.  Example:
 g++ main.cpp aes.cpp -o aes.exe
 ```
 
-All that's left to do it run the output executable named "aes.exe"!
+All that's left to do is create a file for encryption/decryption and run the output executable named "aes.exe"!
 
 <h2>Disclaimer</h2>
 We take no responsibility for any problems that arise from your use of the contents of this repo; do not reuse any code found here in production code.
